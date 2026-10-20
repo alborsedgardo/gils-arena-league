@@ -2,7 +2,9 @@ name: Update standings
 
 on:
   schedule:
-    - cron: "17 * * * *"        # every hour at :17
+    - cron: "*/5 16-23 * * *"   # every 5 min, noon to 8 PM Eastern
+    - cron: "*/5 0-7 * * *"     # every 5 min, 8 PM to 4 AM Eastern
+    - cron: "17 8-15 * * *"     # hourly overnight and mornings
   workflow_dispatch:            # "Run workflow" button for an instant refresh
   push:
     branches: [main]
@@ -30,17 +32,20 @@ jobs:
         with:
           node-version: 20
 
+      - name: Get the current live standings
+        run: curl -fsSL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data.json?t=$(date +%s)" -o /tmp/live.json && mv /tmp/live.json data.json || true
+
       - name: Pull stats and rebuild standings
         run: node scripts/update.mjs
         env:
           BDL_API_KEY: ${{ secrets.BDL_API_KEY }}
 
-      - name: Save data
+      - name: Save player matches
         run: |
           git config user.name "league-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data.json state
-          git diff --staged --quiet || (git commit -m "Update standings" && git push)
+          git add state
+          git diff --staged --quiet || (git commit -m "Update player list" && git push)
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
