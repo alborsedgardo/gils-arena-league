@@ -85,6 +85,11 @@ async function findPlayer(name, cache) {
     try { list = (await api(`${ep}?per_page=100&search=${encodeURIComponent(term)}`)).data || []; }
     catch (e) { if (e.status === 401 || e.status === 403 || e.status === 404) continue; throw e; }
     const hits = list.filter((p) => norm(`${p.first_name} ${p.last_name}`) === key);
+    if (!hits.length) { // nickname fallback, e.g. "Ace" Bailey is listed as Airious Bailey
+      const ln = key.split(' ').slice(1).join(' ');
+      const loose = list.filter((p) => norm(p.last_name) === ln && norm(p.first_name)[0] === key[0] && (p.draft_year || 0) >= season - 20).sort((a, b) => (b.draft_year || 0) - (a.draft_year || 0));
+      if (loose.length) hits.push(loose[0]);
+    }
     if (hits.length) {
       hits.sort((a, b) => (+!!b.team - +!!a.team) || ((b.draft_year || 0) - (a.draft_year || 0)) || (b.id - a.id));
       const p = hits[0];
