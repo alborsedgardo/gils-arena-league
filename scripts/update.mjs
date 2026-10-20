@@ -120,6 +120,9 @@ const picks = (league.picks || []).filter((p) => p && p.player && !p.hidden).map
 }));
 
 let statsAsOf = prevData?.statsAsOf || '';
+const ws = weekStart();
+const wsDay = new Date(ws).toISOString().slice(0, 10);   // Monday of this week
+const preStats = {};   // totals from games before this week, for weekly movement
 const unmatched = [];
 let apiError = '';
 
@@ -132,7 +135,7 @@ if (!OFFLINE && picks.length) {
       if (hit) pk.bdlId = hit.id; else unmatched.push(pk.player);
     }
     const ids = [...new Set(picks.map((p) => p.bdlId).filter(Boolean))];
-    const tot = {};
+    const tot = {}, pre = {};
     let latest = '';
     for (let g = 0; g < ids.length; g += 25) {
       const chunk = ids.slice(g, g + 25);
@@ -146,12 +149,18 @@ if (!OFFLINE && picks.length) {
           if (parseInt(String(r.min ?? '0').split(':')[0], 10) > 0) t.gp++;
           t.pts += r.pts || 0; t.fg3m += r.fg3m || 0; t.fga += r.fga || 0; t.fgm += r.fgm || 0; t.fta += r.fta || 0; t.ftm += r.ftm || 0;
           t.reb += r.reb || 0; t.ast += r.ast || 0; t.stl += r.stl || 0; t.blk += r.blk || 0; t.to += r.turnover || 0;
+          if (String(r.game?.date || '').slice(0, 10) < wsDay) {
+            const q = pre[id] || (pre[id] = zero());
+            if (parseInt(String(r.min ?? '0').split(':')[0], 10) > 0) q.gp++;
+            q.pts += r.pts || 0; q.fg3m += r.fg3m || 0; q.fga += r.fga || 0; q.fgm += r.fgm || 0; q.fta += r.fta || 0; q.ftm += r.ftm || 0;
+            q.reb += r.reb || 0; q.ast += r.ast || 0; q.stl += r.stl || 0; q.blk += r.blk || 0; q.to += r.turnover || 0;
+          }
           const d = r.game?.date; if (d && String(d) > latest) latest = String(d);
         }
         cursor = j.meta?.next_cursor;
       } while (cursor);
     }
-    for (const pk of picks) if (pk.bdlId) pk.st = tot[pk.bdlId] || zero();
+    for (const pk of picks) if (pk.bdlId) { pk.st = tot[pk.bdlId] || zero(); preStats[pk.teamId + '|' + pk.player] = pre[pk.bdlId] || zero(); }
     if (latest) statsAsOf = fmtDay(latest);
   } catch (e) {
     apiError = String(e.message || e);
@@ -176,11 +185,9 @@ const data = {
   unmatched,
 };
 
-// Weekly movement: at the first run of a new week, freeze last week's final standings.
-const ws = weekStart();
-if (picks.length && !OFFLINE && !apiError && (!data.scorePrev || data.scorePrev.ts < ws)) {
-  const base = prevData && prevData.picks?.length ? { ...data, picks: data.picks.map((p) => ({ ...p, st: oldStats[p.teamId + '|' + p.player] || zero() })) } : null;
-  data.scorePrev = base ? snapshot(base, ws) : null;
+// Weekly movement: standings as of Monday, rebuilt from the box scores every run.
+if (picks.length && !OFFLINE && !apiError) {
+  data.scorePrev = snapshot({ ...data, picks: data.picks.map((p) => ({ ...p, st: preStats[p.teamId + '|' + p.player] || zero() })) }, ws);
 }
 
 await mkdir(file('state/'), { recursive: true });
