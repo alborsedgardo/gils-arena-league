@@ -2,10 +2,8 @@ name: Update standings
 
 on:
   schedule:
-    - cron: "*/5 16-23 * * *"   # every 5 min, noon to 8 PM Eastern
-    - cron: "*/5 0-7 * * *"     # every 5 min, 8 PM to 4 AM Eastern
-    - cron: "17 8-15 * * *"     # hourly overnight and mornings
-  workflow_dispatch:            # "Run workflow" button for an instant refresh
+    - cron: "17 * * * *"        # hourly backup; cron-job.org triggers it every 5 min
+  workflow_dispatch:            # "Run workflow" button, and the cron-job.org timer
   push:
     branches: [main]
     paths-ignore: ["data.json", "state/**"]
