@@ -25,6 +25,8 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -38,12 +40,13 @@ jobs:
         env:
           BDL_API_KEY: ${{ secrets.BDL_API_KEY }}
 
-      - name: Save player matches
+      - name: Save player matches and stamp this update
         run: |
           git config user.name "league-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          date -u +%Y-%m-%dT%H:%M:%SZ > state/last-update.txt   # new version each run, so Pages publishes it
           git add state
-          git diff --staged --quiet || (git commit -m "Update player list" && git push)
+          git diff --staged --quiet || (git commit -m "Update standings" && (git push || (git pull --rebase --autostash && git push)))
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
