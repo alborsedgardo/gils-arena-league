@@ -1,5 +1,5 @@
 // Offline support: the app shell is cached; standings always try the network first.
-const V = 'ga-league-v1';
+const V = 'ga-league-v2';
 const SHELL = ['./', 'index.html', 'logo.webp', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
@@ -8,9 +8,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  if (url.pathname.endsWith('/data.json')) {
-    e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(V).then((ca) => ca.put('data.json', c)); return r; })
-      .catch(() => caches.match('data.json')));
+  if (url.pathname.endsWith('/data.json') || url.pathname.endsWith('/lineup.json')) {
+    e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); const key = url.pathname.endsWith('/lineup.json') ? 'lineup.json' : 'data.json'; caches.open(V).then((ca) => ca.put(key, c)); return r; })
+      .catch(() => caches.match(url.pathname.endsWith('/lineup.json') ? 'lineup.json' : 'data.json')));
     return;
   }
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => {
