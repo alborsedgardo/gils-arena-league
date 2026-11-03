@@ -119,6 +119,29 @@ const picks = (league.picks || []).filter((p) => p && p.player && !p.hidden).map
   bdlId: p.bdlId ? +p.bdlId : null, st: oldStats[p.teamId + '|' + p.player] || zero(),
 }));
 
+// Lineup changes made by the hosts in the phone app (Google Sheet). Overrides the drafted starter/bench spots.
+const lineupCfg = await readJson('lineup.json', {});
+let lineupNote = '';
+if (lineupCfg.url && !OFFLINE) {
+  try {
+    const res = await fetch(String(lineupCfg.url) + (String(lineupCfg.url).includes('?') ? '&' : '?') + 'action=lineup', { redirect: 'follow' });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'lineup service error');
+    let n = 0;
+    for (const pk of picks) {
+      const k = pk.teamId + '|' + pk.player;
+      if (k in (j.overrides || {})) { const b = !!j.overrides[k]; if (b !== pk.bench) n++; pk.bench = b; }
+    }
+    lineupNote = `${n} lineup change${n === 1 ? '' : 's'} from the app`;
+  } catch (e) {
+    lineupNote = 'lineup service unreachable: ' + String(e.message || e);
+    // keep the previous run's spots so a hiccup doesn't undo swaps
+    const prevBench = {};
+    for (const pk of prevData?.picks || []) prevBench[pk.teamId + '|' + pk.player] = !!pk.bench;
+    for (const pk of picks) { const k = pk.teamId + '|' + pk.player; if (k in prevBench) pk.bench = prevBench[k]; }
+  }
+}
+
 let statsAsOf = prevData?.statsAsOf || '';
 const ws = weekStart();
 const wsDay = new Date(ws).toISOString().slice(0, 10);   // Monday of this week
@@ -195,6 +218,7 @@ await writeFile(file('data.json'), JSON.stringify(data));
 await writeFile(file('state/player-ids.json'), JSON.stringify(cache, null, 1));
 
 const st = standings(data);
+if (lineupNote) console.log('Lineups: ' + lineupNote);
 console.log(`Season ${season}-${String(season + 1).slice(2)} · ${picks.length} picks · stats through ${statsAsOf || '—'}`);
 for (const e of st) console.log(`  ${e.rank}. ${data.teams.find((t) => t.id === e.id)?.name}  ${e.fp}`);
 if (unmatched.length) console.log('::warning::No BALLDONTLIE match for: ' + unmatched.join(', ') + '. Check spelling in league.json or add "bdlId".');
