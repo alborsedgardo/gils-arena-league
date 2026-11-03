@@ -54,13 +54,17 @@ jobs:
           path: "."
       - id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 120000            # give up after 2 min instead of 10
         continue-on-error: true      # if another Pages deploy is still finishing, don't fail the run
 
       - name: Wait for the other deploy to finish
         if: steps.deploy.outcome == 'failure'
-        run: sleep 90
+        run: sleep 60
 
       - name: Retry the deploy once
         if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 120000
         continue-on-error: true      # still busy? the next run (5 min) publishes it anyway
